@@ -8,9 +8,17 @@
 package frc.robot;
 
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import frc.robot.component.DriveBase;
+import frc.robot.path.Path;
+import frc.robot.path.PathCache;
 
 public class Robot extends TimedRobot {
-    private final MechanumDrive drive = new MechanumDrive();
+    private final DriveBase drive = new DriveBase();
+
+    private final PathCache pathCache = new PathCache();
+    private final SendableChooser<Path> pathSelector =
+            new SendableChooser<>();
 
     public static Robot newRobot() {
         return new Robot();
@@ -19,19 +27,21 @@ public class Robot extends TimedRobot {
     @Override
     public void robotInit() {
         System.out.println("Robot initialization");
-    }
 
-    @Override
-    public void robotPeriodic() {
+        this.pathCache.init();
+        this.pathCache.populate(this.pathSelector);
     }
 
     @Override
     public void autonomousInit() {
         System.out.println("Auton initialization");
+
+        this.drive.queuePath(this.pathSelector.getSelected());
     }
 
     @Override
     public void autonomousPeriodic() {
+        this.drive.tickPath();
     }
 
     @Override
