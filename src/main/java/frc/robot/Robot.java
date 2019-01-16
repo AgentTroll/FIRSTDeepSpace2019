@@ -8,17 +8,27 @@
 package frc.robot;
 
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.command.CommandGroup;
+import edu.wpi.first.wpilibj.command.Scheduler;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
-import frc.robot.component.DriveBase;
-import frc.robot.path.Path;
+import frc.robot.auto.sandstorm.SandstormGroup;
+import frc.robot.component.RobotDrive;
 import frc.robot.path.PathCache;
+import frc.robot.path.PlannedPath;
+import frc.robot.util.RobotLogger;
+import lombok.Getter;
 
 public class Robot extends TimedRobot {
-    private final DriveBase drive = new DriveBase();
+    @Getter
+    private final RobotLogger logger = new RobotLogger();
 
-    private final PathCache pathCache = new PathCache();
-    private final SendableChooser<Path> pathSelector =
+    @Getter
+    private final RobotDrive drive = new RobotDrive(this);
+
+    private final PathCache pathCache = new PathCache(this);
+    private final SendableChooser<PlannedPath> pathSelector =
             new SendableChooser<>();
+    private CommandGroup autoCommands;
 
     public static Robot newRobot() {
         return new Robot();
@@ -26,7 +36,7 @@ public class Robot extends TimedRobot {
 
     @Override
     public void robotInit() {
-        System.out.println("Robot initialization");
+        this.logger.log("Robot initialization");
 
         this.pathCache.init();
         this.pathCache.populate(this.pathSelector);
@@ -34,19 +44,25 @@ public class Robot extends TimedRobot {
 
     @Override
     public void autonomousInit() {
-        System.out.println("Auton initialization");
+        this.logger.log("Auton initialization");
 
-        this.drive.queuePath(this.pathSelector.getSelected());
+        PlannedPath path = this.pathSelector.getSelected();
+        if (path != null) {
+            this.autoCommands = new SandstormGroup(this, path);
+            this.autoCommands.start();
+        }
     }
 
     @Override
     public void autonomousPeriodic() {
-        this.drive.tickPath();
+        Scheduler.getInstance().run();
     }
 
     @Override
     public void teleopInit() {
-        System.out.println("Teleop initialization");
+        this.logger.log("Teleop initialization");
+
+        this.autoCommands.cancel();
     }
 
     @Override

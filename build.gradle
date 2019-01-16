@@ -51,6 +51,8 @@ dependencies {
     compile wpi.deps.vendor.java()
     nativeZip wpi.deps.vendor.jni(wpi.platforms.roborio)
     nativeDesktopZip wpi.deps.vendor.jni(wpi.platforms.desktop)
+
+    compileOnly group: 'com.google.code.findbugs', name: 'jsr305', version: '3.0.2'
 }
 
 // Setting up my Jar File. In this case, adding all libraries into the main jar ('fat jar')
