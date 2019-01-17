@@ -1,23 +1,27 @@
 package frc.robot.path;
 
 import jaci.pathfinder.Trajectory;
+import jaci.pathfinder.Trajectory.Segment;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 import javax.annotation.Nonnull;
 
 @RequiredArgsConstructor
 public class PlannedPath {
+    @Getter
+    private final String name;
     private final Trajectory trajectory;
     private int index;
 
     @Nonnull
-    public Trajectory.Segment getSegmentAndIncr() {
-        Trajectory.Segment[] segments = this.trajectory.segments;
+    public Segment getSegmentAndIncr() {
+        Segment[] segments = this.trajectory.segments;
         return segments[this.index];
     }
 
     public boolean isComplete() {
-        Trajectory.Segment[] segments = this.trajectory.segments;
+        Segment[] segments = this.trajectory.segments;
         return this.index >= segments.length;
     }
 

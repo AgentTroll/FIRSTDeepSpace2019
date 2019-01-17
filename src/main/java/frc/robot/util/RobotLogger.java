@@ -8,4 +8,8 @@ public class RobotLogger {
     public void error(String msg) {
         System.err.println("[ERROR] " + msg);
     }
+
+    public void dumpStack() {
+        new Exception().printStackTrace(System.err);
+    }
 }

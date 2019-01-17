@@ -8,10 +8,10 @@
 package frc.robot;
 
 import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.command.CommandGroup;
 import edu.wpi.first.wpilibj.command.Scheduler;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import frc.robot.auto.sandstorm.SandstormGroup;
+import frc.robot.component.NavX;
 import frc.robot.component.RobotDrive;
 import frc.robot.path.PathCache;
 import frc.robot.path.PlannedPath;
@@ -22,13 +22,16 @@ public class Robot extends TimedRobot {
     @Getter
     private final RobotLogger logger = new RobotLogger();
 
+    private final PathCache pathCache = new PathCache(this);
     @Getter
     private final RobotDrive drive = new RobotDrive(this);
+    @Getter
+    private final NavX navX = new NavX(this);
 
-    private final PathCache pathCache = new PathCache(this);
-    private final SendableChooser<PlannedPath> pathSelector =
-            new SendableChooser<>();
-    private CommandGroup autoCommands;
+    private final SendableChooser<PlannedPath> pathSelector = new SendableChooser<>();
+    private final SandstormGroup autoCommands = new SandstormGroup(this);
+
+    private boolean wasPreviouslyRunning;
 
     public static Robot newRobot() {
         return new Robot();
@@ -38,8 +41,24 @@ public class Robot extends TimedRobot {
     public void robotInit() {
         this.logger.log("Robot initialization");
 
+        this.reset();
+
+        this.logger.log("wasPreviouslyRunning = " + this.wasPreviouslyRunning);
+        if (this.wasPreviouslyRunning) {
+            return;
+        }
+
+        this.wasPreviouslyRunning = true;
         this.pathCache.init();
         this.pathCache.populate(this.pathSelector);
+    }
+
+    private void reset() {
+        this.logger.log("Resetting the robot...");
+        this.navX.cancelAction();
+        this.drive.clearPaths();
+
+        this.navX.reset();
     }
 
     @Override
@@ -48,13 +67,14 @@ public class Robot extends TimedRobot {
 
         PlannedPath path = this.pathSelector.getSelected();
         if (path != null) {
-            this.autoCommands = new SandstormGroup(this, path);
+            this.autoCommands.init(path);
             this.autoCommands.start();
         }
     }
 
     @Override
     public void autonomousPeriodic() {
+        // Run the autoCommands group
         Scheduler.getInstance().run();
     }
 
@@ -63,6 +83,7 @@ public class Robot extends TimedRobot {
         this.logger.log("Teleop initialization");
 
         this.autoCommands.cancel();
+        this.drive.clearPaths();
     }
 
     @Override

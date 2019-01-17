@@ -12,18 +12,18 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 
 @RequiredArgsConstructor
 public class PathCache {
     private static final Path PATHS_DIR = Paths.get("./paths");
 
     private final Robot robot;
-    private final Map<String, PlannedPath> cache =
-            new HashMap<>();
+    private final Map<String, PlannedPath> cache = new HashMap<>();
 
     public void init() {
-        try {
-            Files.walk(PATHS_DIR).forEach(this::parsePath);
+        try (Stream<Path> stream = Files.walk(PATHS_DIR)) {
+            stream.forEach(this::parsePath);
         } catch (IOException e) {
             this.robot.getLogger().error("Failed to initialize PathCache");
             e.printStackTrace();
@@ -37,10 +37,11 @@ public class PathCache {
             return;
         }
 
+        String pathName = fileName.substring(0, fileName.indexOf('.'));
         Trajectory traj = Pathfinder.readFromCSV(path.toFile());
-        PlannedPath p = new PlannedPath(traj);
+        PlannedPath plannedPath = new PlannedPath(pathName, traj);
 
-        this.cache.put(fileName.substring(0, fileName.indexOf('.')), p);
+        this.cache.put(pathName, plannedPath);
         this.robot.getLogger().log("Parsed path file: " + fileName);
     }
 
