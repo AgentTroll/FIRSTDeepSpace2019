@@ -65,7 +65,7 @@ public class RobotDrive {
             @Override
             protected void accept(double normalizedAngle) {
                 double rad = d2r(angle);
-                driveRaw(magnitude * sin(rad),
+                drive(magnitude * sin(rad),
                         magnitude * cos(rad),
                         normalizedAngle,
                         navX.getYaw());
@@ -79,7 +79,7 @@ public class RobotDrive {
         });
     }
 
-    public void driveRaw(double y, double x, double z, double gyro) {
+    public void drive(double y, double x, double z, double gyro) {
         this.drive.driveCartesian(y, x, z, gyro);
     }
 

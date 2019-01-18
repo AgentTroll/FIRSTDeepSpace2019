@@ -8,8 +8,11 @@ import frc.robot.Robot;
 import lombok.Getter;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 
 public class NavX implements PIDOutput {
+    private static final long TIMEOUT_MS = 5_000;
+
     private final Robot robot;
     @Getter
     private final AHRS dev;
@@ -17,14 +20,14 @@ public class NavX implements PIDOutput {
     private final PIDController controller;
 
     @Nullable
-    private Listener listener;
+    private volatile Listener listener;
 
     public NavX(Robot robot) {
         this.robot = robot;
         this.dev = new AHRS(Port.kMXP);
 
         // TODO: Figure out the PID values
-        this.controller = new PIDController(0.05, 0, 0, 0, this.dev, this);
+        this.controller = new PIDController(0.0145, 0, 0.03, 0, this.dev, this);
         this.controller.setInputRange(-180, 180);
         this.controller.setAbsoluteTolerance(5);
         this.controller.setContinuous(false);
@@ -40,6 +43,8 @@ public class NavX implements PIDOutput {
     }
 
     private void awaitCalibration() {
+        long beginTime = System.currentTimeMillis();
+
         boolean connected;
         boolean calibrating;
         boolean hasShifted;
@@ -47,6 +52,12 @@ public class NavX implements PIDOutput {
             connected = this.dev.isConnected();
             calibrating = this.dev.isCalibrating();
             hasShifted = this.dev.isMoving() || this.dev.isRotating();
+
+            long elapsed = System.currentTimeMillis() - beginTime;
+            if (elapsed > TIMEOUT_MS) {
+                this.robot.getLogger().error("Calibration has taken longer than " + TIMEOUT_MS + "ms, proceeding anyways...");
+                break;
+            }
         } while (!connected || calibrating || hasShifted);
     }
 
@@ -83,22 +94,31 @@ public class NavX implements PIDOutput {
 
     @Override
     public void pidWrite(double output) {
-        if (this.listener != null) {
-            if (this.listener.writeAngle(output)) {
+        Listener listener = this.listener;
+        if (listener != null) {
+            if (listener.writeAngle(output)) {
                 this.cancelAction();
             }
         }
     }
 
     public abstract static class Listener {
-        @Getter
+        @GuardedBy("this")
         private double lastAngleNormalized;
 
         final boolean writeAngle(double newAngle) {
-            this.lastAngleNormalized = newAngle;
+            synchronized (this) {
+                this.lastAngleNormalized = newAngle;
+            }
             this.accept(newAngle);
 
             return this.isFinished();
+        }
+
+        public double getLastAngleNormalized() {
+            synchronized (this) {
+                return this.lastAngleNormalized;
+            }
         }
 
         protected abstract void accept(double normalizedAngle);
