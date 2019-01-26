@@ -2,13 +2,11 @@ package frc.robot.component;
 
 import edu.wpi.first.wpilibj.GenericHID.RumbleType;
 import edu.wpi.first.wpilibj.XboxController;
-import lombok.RequiredArgsConstructor;
 
 import static edu.wpi.first.wpilibj.GenericHID.Hand.kLeft;
 import static edu.wpi.first.wpilibj.GenericHID.Hand.kRight;
 import static frc.robot.RobotMap.CONTROLLER;
 
-@RequiredArgsConstructor
 public class Controller {
     private final XboxController controller = new XboxController(CONTROLLER);
 
