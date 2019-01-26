@@ -30,12 +30,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Robot extends TimedRobot {
-    private static final Map<Integer, Integer> angleMapping = new HashMap<>(4, 1);
+    private static final Map<Integer, Integer> ANGLE_MAP = new HashMap<>(4, 1);
     static {
-        angleMapping.put(45, 30);
-        angleMapping.put(135, 150);
-        angleMapping.put(225, 210);
-        angleMapping.put(315, 330);
+        ANGLE_MAP.put(45, 30);
+        ANGLE_MAP.put(135, 150);
+        ANGLE_MAP.put(225, 210);
+        ANGLE_MAP.put(315, 330);
     }
 
     @Getter
@@ -184,7 +184,7 @@ public class Robot extends TimedRobot {
             return;
         }
 
-        controllerPOV = angleMapping.getOrDefault(controllerPOV, controllerPOV); // re-map angle to be correct
+        controllerPOV = ANGLE_MAP.getOrDefault(controllerPOV, controllerPOV); // re-map angle to be correct
         controllerPOV = (controllerPOV > 180) ? controllerPOV - 360 : controllerPOV; // adjust range to (-180, 180]
 
         if (controllerPOV % 90 != 0) { // Controller POV is at mixed angle
