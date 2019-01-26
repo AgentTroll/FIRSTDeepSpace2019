@@ -3,7 +3,9 @@ package frc.robot.component;
 import com.kauailabs.navx.frc.AHRS;
 import edu.wpi.first.wpilibj.PIDController;
 import edu.wpi.first.wpilibj.PIDOutput;
+import edu.wpi.first.wpilibj.PIDSourceType;
 import edu.wpi.first.wpilibj.SerialPort.Port;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Robot;
 import lombok.Getter;
 
@@ -12,6 +14,7 @@ import javax.annotation.concurrent.GuardedBy;
 
 public class NavX implements PIDOutput {
     private static final long TIMEOUT_MS = 5_000;
+    private static final double COLLISION_G_THRESHOLD = 2f;
 
     private final Robot robot;
     @Getter
@@ -19,18 +22,21 @@ public class NavX implements PIDOutput {
 
     private final PIDController controller;
 
+    private double lastXAccel;
+    private double lastYAccel;
+
     @Nullable
-    private volatile Listener listener;
+    private volatile NavXListener listener;
 
     public NavX(Robot robot) {
         this.robot = robot;
         this.dev = new AHRS(Port.kMXP);
+        this.dev.setPIDSourceType(PIDSourceType.kDisplacement);
 
-        // TODO: Figure out the PID values
-        this.controller = new PIDController(0.0145, 0, 0.03, 0, this.dev, this);
+        this.controller = new PIDController(0.01, 0, 0.05, 0, this.dev, this);
         this.controller.setInputRange(-180, 180);
-        this.controller.setAbsoluteTolerance(5);
-        this.controller.setContinuous(false);
+        this.controller.setAbsoluteTolerance(2);
+        this.controller.setContinuous(true);
         this.controller.setOutputRange(-1, 1);
     }
 
@@ -61,12 +67,16 @@ public class NavX implements PIDOutput {
         } while (!connected || calibrating || hasShifted);
     }
 
+    public boolean isConnected() {
+        return this.dev.isConnected();
+    }
+
     public double getYaw() {
         return this.dev.getYaw();
     }
 
-    public void beginAction(double angle, Listener listener) {
-        Listener current = this.listener;
+    public void beginAction(double angle, @Nullable NavXListener listener) {
+        NavXListener current = this.listener;
         if (current != null) {
             this.robot.getLogger().error("NavX listener " + current + " is being replaced by " + listener);
             this.robot.getLogger().dumpStack();
@@ -79,7 +89,15 @@ public class NavX implements PIDOutput {
         this.controller.enable();
     }
 
-    public void cancelAction(Listener listener) {
+    public void obtrudeSetpoint(double setpoint) {
+        this.controller.setSetpoint(setpoint);
+    }
+
+    public double getSetpoint() {
+        return this.controller.getSetpoint();
+    }
+
+    public void cancelAction(NavXListener listener) {
         if (this.listener == listener) {
             this.cancelAction();
         }
@@ -92,9 +110,26 @@ public class NavX implements PIDOutput {
         }
     }
 
+    public boolean hasCollided() {
+        double curXAccel = this.dev.getWorldLinearAccelX();
+        double currentJerkX = curXAccel - this.lastXAccel;
+        this.lastXAccel = curXAccel;
+        double curYAccel = this.dev.getWorldLinearAccelY();
+        double currentJerkY = curYAccel - this.lastYAccel;
+        this.lastYAccel = curYAccel;
+
+        return Math.abs(currentJerkX) > COLLISION_G_THRESHOLD ||
+                Math.abs(currentJerkY) > COLLISION_G_THRESHOLD;
+    }
+
+    public void printTelemetry() {
+        SmartDashboard.putNumber("X Displacement", this.dev.getDisplacementX());
+        SmartDashboard.putNumber("Y Displacement", this.dev.getDisplacementY());
+    }
+
     @Override
     public void pidWrite(double output) {
-        Listener listener = this.listener;
+        NavXListener listener = this.listener;
         if (listener != null) {
             if (listener.writeAngle(output)) {
                 this.cancelAction();
@@ -102,22 +137,22 @@ public class NavX implements PIDOutput {
         }
     }
 
-    public abstract static class Listener {
+    public abstract static class NavXListener {
         @GuardedBy("this")
-        private double lastAngleNormalized;
+        private double output;
 
-        final boolean writeAngle(double newAngle) {
+        final boolean writeAngle(double output) {
             synchronized (this) {
-                this.lastAngleNormalized = newAngle;
+                this.output = output;
             }
-            this.accept(newAngle);
+            this.accept(output);
 
             return this.isFinished();
         }
 
-        public double getLastAngleNormalized() {
+        public double getOutput() {
             synchronized (this) {
-                return this.lastAngleNormalized;
+                return this.output;
             }
         }
 

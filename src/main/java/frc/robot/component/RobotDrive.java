@@ -1,8 +1,10 @@
 package frc.robot.component;
 
+import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
 import frc.robot.Robot;
+import frc.robot.component.NavX.NavXListener;
 import frc.robot.path.PlannedPath;
 import jaci.pathfinder.Trajectory.Segment;
 
@@ -17,19 +19,29 @@ import static java.lang.Math.sin;
 
 public class RobotDrive {
     private final Robot robot;
-    private final MecanumDrive drive;
+
+    private final WPI_TalonSRX left1 = new WPI_TalonSRX(LEFT_MOTOR_1);
+    private final WPI_TalonSRX left2 = new WPI_TalonSRX(LEFT_MOTOR_2);
+    private final WPI_TalonSRX right1 = new WPI_TalonSRX(RIGHT_MOTOR_1);
+    private final WPI_TalonSRX right2 = new WPI_TalonSRX(RIGHT_MOTOR_2);
+    private final MecanumDrive drive = new MecanumDrive(this.left1, this.left2, this.right1, this.right2);
 
     private final Deque<PlannedPath> pathQueue =
             new LinkedList<>();
 
     public RobotDrive(Robot robot) {
         this.robot = robot;
+    }
 
-        WPI_TalonSRX left1 = new WPI_TalonSRX(LEFT_MOTOR_1);
-        WPI_TalonSRX left2 = new WPI_TalonSRX(LEFT_MOTOR_2);
-        WPI_TalonSRX right1 = new WPI_TalonSRX(RIGHT_MOTOR_1);
-        WPI_TalonSRX right2 = new WPI_TalonSRX(RIGHT_MOTOR_2);
-        this.drive = new MecanumDrive(left1, left2, right1, right2);
+    public void init() {
+        this.drive.setDeadband(0.1);
+    }
+
+    public void setNeutralMode(NeutralMode mode) {
+        this.left1.setNeutralMode(mode);
+        this.left2.setNeutralMode(mode);
+        this.right1.setNeutralMode(mode);
+        this.right2.setNeutralMode(mode);
     }
 
     public void queuePath(@Nonnull PlannedPath path) {
@@ -61,11 +73,11 @@ public class RobotDrive {
         double angle = segment.heading;
 
         NavX navX = this.robot.getNavX();
-        navX.beginAction(angle, new NavX.Listener() {
+        navX.beginAction(angle, new NavXListener() {
             @Override
             protected void accept(double normalizedAngle) {
                 double rad = d2r(angle);
-                drive(magnitude * sin(rad),
+                RobotDrive.this.drive(magnitude * sin(rad),
                         magnitude * cos(rad),
                         normalizedAngle,
                         navX.getYaw());
