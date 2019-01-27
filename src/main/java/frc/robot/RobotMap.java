@@ -9,6 +9,12 @@ public final class RobotMap {
 
     public static final int CONTROLLER = 0;
 
+    // Accelerometer ports
+    public static final int POS_ACCEL_X = 0;
+    public static final int NEG_ACCEL_X = 1;
+    public static final int POS_ACCEL_Y = 2;
+    public static final int NEG_ACCEL_Y = 3;
+
     // Suppress instantiation
     private RobotMap() {
     }

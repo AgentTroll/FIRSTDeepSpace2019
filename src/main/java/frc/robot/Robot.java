@@ -8,15 +8,12 @@
 package frc.robot;
 
 import com.ctre.phoenix.motorcontrol.NeutralMode;
-import edu.wpi.cscore.UsbCamera;
-import edu.wpi.cscore.VideoMode;
-import edu.wpi.cscore.VideoMode.PixelFormat;
-import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.command.Scheduler;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.auto.sandstorm.SandstormGroup;
+import frc.robot.component.Accelerometer;
 import frc.robot.component.Controller;
 import frc.robot.component.NavX;
 import frc.robot.component.NavX.NavXListener;
@@ -31,6 +28,7 @@ import java.util.Map;
 
 public class Robot extends TimedRobot {
     private static final Map<Integer, Integer> ANGLE_MAP = new HashMap<>(4, 1);
+
     static {
         ANGLE_MAP.put(45, 30);
         ANGLE_MAP.put(135, 150);
@@ -46,6 +44,7 @@ public class Robot extends TimedRobot {
     private final RobotDrive drive = new RobotDrive(this);
     @Getter
     private final NavX navX = new NavX(this);
+    private final Accelerometer accelerometer = new Accelerometer(this);
     private final Controller controller = new Controller();
 
     private final SendableChooser<PlannedPath> pathSelector = new SendableChooser<>();
@@ -82,14 +81,15 @@ public class Robot extends TimedRobot {
             return;
         }
 
-        UsbCamera camera = CameraServer.getInstance().startAutomaticCapture();
-        camera.setVideoMode(new VideoMode(PixelFormat.kMJPEG, 500, 500, 10));
+        // UsbCamera camera = CameraServer.getInstance().startAutomaticCapture();
+        // camera.setVideoMode(new VideoMode(PixelFormat.kMJPEG, 500, 500, 10));
 
         this.wasPreviouslyRunning = true;
         this.pathCache.init();
         this.pathCache.populate(this.pathSelector);
 
         this.drive.init();
+        this.accelerometer.init();
     }
 
     private void reset() {
@@ -104,10 +104,6 @@ public class Robot extends TimedRobot {
     public void autonomousInit() {
         this.logger.log("Auton initialization");
 
-        // J - Seems to be debug code
-        /* this.navX.reset();
-        this.navX.beginAction(0, null); */
-
         PlannedPath path = this.pathSelector.getSelected();
         if (path != null) {
             this.autoCommands.init(path);
@@ -120,9 +116,12 @@ public class Robot extends TimedRobot {
         // Run the autoCommands group
         Scheduler.getInstance().run();
 
-        // J - Seems to be debug code
-        /* this.drive.drive(0, 0, this.rotateToAngleRate, 0);
-        this.navX.printTelemetry(); */
+        this.accelerometer.tick();
+        // J - looks like debug code to me
+        // this.drive.drive(0, 0, 0, 0);
+
+        this.accelerometer.printTelemetry();
+        this.navX.printTelemetry();
     }
 
     @Override

@@ -75,6 +75,10 @@ public class NavX implements PIDOutput {
         return this.dev.getYaw();
     }
 
+    public boolean isMoving() {
+        return this.dev.isMoving();
+    }
+
     public void beginAction(double angle, @Nullable NavXListener listener) {
         NavXListener current = this.listener;
         if (current != null) {
@@ -123,8 +127,8 @@ public class NavX implements PIDOutput {
     }
 
     public void printTelemetry() {
-        SmartDashboard.putNumber("X Displacement", this.dev.getDisplacementX());
-        SmartDashboard.putNumber("Y Displacement", this.dev.getDisplacementY());
+        SmartDashboard.putNumber("NavX X Displacement", this.dev.getDisplacementX());
+        SmartDashboard.putNumber("NavX Y Displacement", this.dev.getDisplacementY());
     }
 
     @Override
