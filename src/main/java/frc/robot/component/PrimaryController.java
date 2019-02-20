@@ -5,17 +5,24 @@ import edu.wpi.first.wpilibj.XboxController;
 
 import static edu.wpi.first.wpilibj.GenericHID.Hand.kLeft;
 import static edu.wpi.first.wpilibj.GenericHID.Hand.kRight;
-import static frc.robot.RobotMap.CONTROLLER;
+import static frc.robot.RobotMap.PRIMARY_CONTROLLER;
 
-public class Controller {
-    private final XboxController controller = new XboxController(CONTROLLER);
+public class PrimaryController {
+    private final XboxController controller = new XboxController(PRIMARY_CONTROLLER);
 
     public boolean isAPressed() {
-        // TODO: Verify the right button
         return this.controller.getRawButton(1);
     }
 
-    public boolean isStartPressed() {
+    public boolean isXPressed() {
+        return this.controller.getRawButton(3);
+    }
+
+    public boolean getLeftBumper() {
+        return this.controller.getRawButtonReleased(5);
+    }
+
+    public boolean getStartButton() {
         return this.controller.getStartButtonPressed();
     }
 

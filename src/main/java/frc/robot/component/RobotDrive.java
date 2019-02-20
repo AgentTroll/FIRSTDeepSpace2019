@@ -4,7 +4,6 @@ import com.ctre.phoenix.motorcontrol.NeutralMode;
 import com.ctre.phoenix.motorcontrol.can.WPI_TalonSRX;
 import edu.wpi.first.wpilibj.drive.MecanumDrive;
 import frc.robot.Robot;
-import frc.robot.component.NavX.NavXListener;
 import frc.robot.path.PlannedPath;
 import jaci.pathfinder.Trajectory.Segment;
 
@@ -31,6 +30,11 @@ public class RobotDrive {
 
     public RobotDrive(Robot robot) {
         this.robot = robot;
+
+        this.left1.setInverted(true);
+        this.left2.setInverted(true);
+        this.right1.setInverted(true);
+        this.right2.setInverted(true);
     }
 
     public void init() {
@@ -42,6 +46,10 @@ public class RobotDrive {
         this.left2.setNeutralMode(mode);
         this.right1.setNeutralMode(mode);
         this.right2.setNeutralMode(mode);
+    }
+
+    public void setSafetyEnabled(boolean enabled) {
+        this.drive.setSafetyEnabled(enabled);
     }
 
     public void queuePath(@Nonnull PlannedPath path) {
@@ -73,22 +81,11 @@ public class RobotDrive {
         double angle = segment.heading;
 
         NavX navX = this.robot.getNavX();
-        navX.beginAction(angle, new NavXListener() {
-            @Override
-            protected void accept(double normalizedAngle) {
-                double rad = d2r(angle);
-                RobotDrive.this.drive(magnitude * sin(rad),
-                        magnitude * cos(rad),
-                        normalizedAngle,
-                        navX.getYaw());
-            }
-
-            @Override
-            protected boolean isFinished() {
-                // Only complete a single run
-                return true;
-            }
-        });
+        double rad = d2r(angle);
+        this.drive(magnitude * sin(rad),
+                magnitude * cos(rad),
+                navX.getOutput(),
+                navX.getYaw());
     }
 
     public void drive(double y, double x, double z, double gyro) {

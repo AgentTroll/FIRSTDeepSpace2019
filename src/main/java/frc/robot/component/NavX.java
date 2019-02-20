@@ -4,17 +4,13 @@ import com.kauailabs.navx.frc.AHRS;
 import edu.wpi.first.wpilibj.PIDController;
 import edu.wpi.first.wpilibj.PIDOutput;
 import edu.wpi.first.wpilibj.PIDSourceType;
-import edu.wpi.first.wpilibj.SerialPort.Port;
+import edu.wpi.first.wpilibj.SerialPort;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Robot;
 import lombok.Getter;
 
-import javax.annotation.Nullable;
-import javax.annotation.concurrent.GuardedBy;
-
 public class NavX implements PIDOutput {
     private static final long TIMEOUT_MS = 5_000;
-    private static final double COLLISION_G_THRESHOLD = 2f;
 
     private final Robot robot;
     @Getter
@@ -22,22 +18,21 @@ public class NavX implements PIDOutput {
 
     private final PIDController controller;
 
-    private double lastXAccel;
-    private double lastYAccel;
-
-    @Nullable
-    private volatile NavXListener listener;
+    @Getter
+    private double output;
 
     public NavX(Robot robot) {
         this.robot = robot;
-        this.dev = new AHRS(Port.kMXP);
+        this.dev = new AHRS(SerialPort.Port.kMXP);
         this.dev.setPIDSourceType(PIDSourceType.kDisplacement);
 
-        this.controller = new PIDController(0.01, 0, 0.05, 0, this.dev, this);
-        this.controller.setInputRange(-180, 180);
-        this.controller.setAbsoluteTolerance(2);
-        this.controller.setContinuous(true);
+        this.controller = new PIDController(0.0105, 0.00, 0.005, 0.00, this.dev, this);
+        this.controller.setInputRange(-180.0, 180.0);
         this.controller.setOutputRange(-1, 1);
+        this.controller.setAbsoluteTolerance(2.0);
+        this.controller.setContinuous(true);
+        this.controller.enable();
+        this.controller.setSetpoint(0);
     }
 
     public void reset() {
@@ -75,21 +70,20 @@ public class NavX implements PIDOutput {
         return this.dev.getYaw();
     }
 
+    public double getAngle() {
+        return this.dev.getAngle();
+    }
+
     public boolean isMoving() {
         return this.dev.isMoving();
     }
 
-    public void beginAction(double angle, @Nullable NavXListener listener) {
-        NavXListener current = this.listener;
-        if (current != null) {
-            this.robot.getLogger().error("NavX listener " + current + " is being replaced by " + listener);
-            this.robot.getLogger().dumpStack();
+    public void begin() {
+        this.controller.enable();
+    }
 
-            this.controller.disable();
-        }
-
+    public void beginAction(double angle) {
         this.controller.setSetpoint(angle);
-        this.listener = listener;
         this.controller.enable();
     }
 
@@ -97,71 +91,23 @@ public class NavX implements PIDOutput {
         this.controller.setSetpoint(setpoint);
     }
 
-    public double getSetpoint() {
-        return this.controller.getSetpoint();
-    }
-
-    public void cancelAction(NavXListener listener) {
-        if (this.listener == listener) {
-            this.cancelAction();
-        }
-    }
-
-    public void cancelAction() {
-        if (this.controller.isEnabled()) {
-            this.listener = null;
-            this.controller.disable();
-        }
-    }
-
-    public boolean hasCollided() {
-        double curXAccel = this.dev.getWorldLinearAccelX();
-        double currentJerkX = curXAccel - this.lastXAccel;
-        this.lastXAccel = curXAccel;
-        double curYAccel = this.dev.getWorldLinearAccelY();
-        double currentJerkY = curYAccel - this.lastYAccel;
-        this.lastYAccel = curYAccel;
-
-        return Math.abs(currentJerkX) > COLLISION_G_THRESHOLD ||
-                Math.abs(currentJerkY) > COLLISION_G_THRESHOLD;
-    }
-
     public void printTelemetry() {
-        SmartDashboard.putNumber("NavX X Displacement", this.dev.getDisplacementX());
-        SmartDashboard.putNumber("NavX Y Displacement", this.dev.getDisplacementY());
+        SmartDashboard.putNumber("Get Angle", this.dev.getAngle());
+        SmartDashboard.putBoolean("NavX Connected", this.dev.isConnected());
+
+        SmartDashboard.putNumber("Target", this.controller.getSetpoint());
+        SmartDashboard.putNumber("Set Point", this.controller.getSetpoint());
+        SmartDashboard.putBoolean("onTarget", this.controller.onTarget());
+
+        SmartDashboard.putNumber("Rotate to Angle Rate", this.output);
     }
 
     @Override
     public void pidWrite(double output) {
-        NavXListener listener = this.listener;
-        if (listener != null) {
-            if (listener.writeAngle(output)) {
-                this.cancelAction();
-            }
+        if (this.controller.onTarget()) {
+            this.output = 0;
+        } else {
+            this.output = output;
         }
-    }
-
-    public abstract static class NavXListener {
-        @GuardedBy("this")
-        private double output;
-
-        final boolean writeAngle(double output) {
-            synchronized (this) {
-                this.output = output;
-            }
-            this.accept(output);
-
-            return this.isFinished();
-        }
-
-        public double getOutput() {
-            synchronized (this) {
-                return this.output;
-            }
-        }
-
-        protected abstract void accept(double normalizedAngle);
-
-        protected abstract boolean isFinished();
     }
 }
