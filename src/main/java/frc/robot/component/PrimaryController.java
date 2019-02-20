@@ -10,11 +10,11 @@ import static frc.robot.RobotMap.PRIMARY_CONTROLLER;
 public class PrimaryController {
     private final XboxController controller = new XboxController(PRIMARY_CONTROLLER);
 
-    public boolean isAPressed() {
+    public boolean getAButton() {
         return this.controller.getRawButton(1);
     }
 
-    public boolean isXPressed() {
+    public boolean getXButton() {
         return this.controller.getRawButton(3);
     }
 

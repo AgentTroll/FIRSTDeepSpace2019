@@ -34,9 +34,10 @@ public class HatchMech {
     public void check() {
         SecondaryController controller = this.robot.getSecondaryController();
 
-        if (controller.getAButton()) {
+        if (controller.getAButtonPressed()) {
             this.hatchMechanism.set(DoubleSolenoid.Value.kForward);
-        } else {
+        }
+        if (controller.getAButtonReleased()) {
             this.hatchMechanism.set(DoubleSolenoid.Value.kReverse);
         }
     }

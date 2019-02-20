@@ -10,6 +10,9 @@ import static frc.robot.RobotMap.*;
 
 @RequiredArgsConstructor
 public class Arms {
+    private static final double INTAKE_CURRENT_LIMIT = 12.5;
+    private static final int INTAKE_CURRENT_LIMIT_HARD = 15;
+
     private final Robot robot;
 
     private final WPI_TalonSRX leftArm = new WPI_TalonSRX(LEFT_ARM);
@@ -21,21 +24,31 @@ public class Arms {
     private boolean intakeActive;
     private boolean armsUp = true;
 
+    public void init() {
+        this.intake.configPeakCurrentLimit(0);
+        this.intake.configContinuousCurrentLimit(INTAKE_CURRENT_LIMIT_HARD);
+    }
+
     public void checkSpin() {
         if (this.intakeActive) {
-            this.leftArm.set(-.35);
-            this.rightArm.set(.35);
+            this.leftArm.set(-.28);
+            this.rightArm.set(-.28);
         } else {
             this.leftArm.set(0);
             this.rightArm.set(0);
         }
     }
 
-    public void runIntake() {
+    public void checkIntake() {
         SecondaryController controller = this.robot.getSecondaryController();
 
         if (controller.getBButton()) {
             this.intakeActive = !this.intakeActive;
+        }
+
+        if (this.intake.getOutputCurrent() > INTAKE_CURRENT_LIMIT) {
+            this.intakeActive = false;
+            this.armsUp = true;
         }
 
         if (this.intakeActive) {
@@ -59,5 +72,6 @@ public class Arms {
 
     public void printTelemetry() {
         SmartDashboard.putBoolean("Arms Up", this.armsUp);
+        SmartDashboard.putNumber("intake current", this.intake.getOutputCurrent());
     }
 }

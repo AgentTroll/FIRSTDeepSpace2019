@@ -9,8 +9,12 @@ import static frc.robot.RobotMap.SECONDARY_CONTROLLER;
 public class SecondaryController {
     private final XboxController controller = new XboxController(SECONDARY_CONTROLLER);
 
-    public boolean getAButton() {
-        return this.controller.getRawButton(1);
+    public boolean getAButtonPressed() {
+        return this.controller.getRawButtonPressed(1);
+    }
+
+    public boolean getAButtonReleased() {
+        return this.controller.getRawButtonReleased(1);
     }
 
     public boolean getBButton() {

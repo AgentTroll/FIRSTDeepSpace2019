@@ -26,7 +26,7 @@ public class NavX implements PIDOutput {
         this.dev = new AHRS(SerialPort.Port.kMXP);
         this.dev.setPIDSourceType(PIDSourceType.kDisplacement);
 
-        this.controller = new PIDController(0.0105, 0.00, 0.005, 0.00, this.dev, this);
+        this.controller = new PIDController(0.0085, 0.00, 0.005, 0.00, this.dev, this);
         this.controller.setInputRange(-180.0, 180.0);
         this.controller.setOutputRange(-1, 1);
         this.controller.setAbsoluteTolerance(2.0);

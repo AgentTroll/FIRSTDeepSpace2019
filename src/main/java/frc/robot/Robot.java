@@ -28,7 +28,11 @@ import static frc.robot.RobotMap.SOLENOID;
 
 @Getter
 public class Robot extends TimedRobot {
+    //TODO: send vision center to network tables
+    //too small - left too big - right
+    private static final double VISION_CENTER_X = 164;
     private static final Map<Integer, Integer> ANGLE_MAP = new HashMap<>();
+
     static {
         ANGLE_MAP.put(45, 30);
         ANGLE_MAP.put(135, 150);
@@ -42,7 +46,10 @@ public class Robot extends TimedRobot {
     private final NavX navX = new NavX(this);
     private final Accelerometer accelerometer = new Accelerometer(this);
     private final Robot.AutoStrafer autoStrafer = new Robot.AutoStrafer();
-    private final PIDController strafeController = new PIDController(2.0, 0, 0, 0, this.autoStrafer, this.autoStrafer);
+    PIDController strafeController = new PIDController(.75, 0, 0.6, 0, this.autoStrafer, this.autoStrafer);
+
+    Robot.AutoDriver autoDriver = new Robot.AutoDriver();
+    PIDController driveController = new PIDController(0.003, 0, 0.01, 0, this.autoDriver, this.autoDriver);
 
     private final PrimaryController primaryController = new PrimaryController();
     private final SecondaryController secondaryController = new SecondaryController();
@@ -60,11 +67,16 @@ public class Robot extends TimedRobot {
     private boolean isFieldCentric = true;
 
     // the centers of the two retro-reflective targets, if both the x and y of a target are zero it isn't detected
-    private double zeroCenterX;
-    private double zeroCenterY;
-    private double oneCenterX;
-    private double oneCenterY;
-    private double contours;
+    private double ballZeroCenterX;
+    private double ballZeroCenterY;
+    private double ballOneCenterX;
+    private double ballOneCenterY;
+    private double hatchZeroCenterX;
+    private double hatchZeroCenterY;
+    private double hatchOneCenterX;
+    private double hatchOneCenterY;
+    private double ballContours;
+    private double hatchContours;
 
     static Robot newRobot() {
         return new Robot();
@@ -75,17 +87,23 @@ public class Robot extends TimedRobot {
     @Override
     public void robotInit() {
         this.drive.init();
+        this.arms.init();
         this.elevator.init();
 
         this.compressor.clearAllPCMStickyFaults();
         this.compressor.setClosedLoopControl(true);
 
-        // this.strafeController.setInputRange(-1000, 1000);
-        this.strafeController.setOutputRange(-1, 1);
+        this.strafeController.setOutputRange(-0.5, 0.5);
         this.strafeController.setAbsoluteTolerance(5);
         this.strafeController.setContinuous(false);
         this.strafeController.enable();
         this.strafeController.setSetpoint(0);
+
+        this.driveController.setOutputRange(-0.4, 0.4);
+        this.driveController.setAbsoluteTolerance(5);
+        this.driveController.setContinuous(false);
+        this.driveController.enable();
+        this.driveController.setSetpoint(240); // pixel distance between targets when fully in (- a bit)
     }
 
     @Override
@@ -129,11 +147,13 @@ public class Robot extends TimedRobot {
         this.arms.checkSpin();
         this.elevator.checkAdjust();
         this.elevator.run();
-        this.arms.runIntake();
+        this.arms.checkIntake();
         this.checkToggleCentric();
+        this.snapToAngle();
 
-        if (this.primaryController.isAPressed()) {
-            this.autoStrafer.run();
+        if (this.primaryController.getAButton()) {
+//            autoStrafer.run();
+            this.autoStrafeDrive();
             return;
         }
 
@@ -143,7 +163,6 @@ public class Robot extends TimedRobot {
 
         if (this.isFieldCentric) {
             this.driveCentric();
-            this.snapToAngle();
         } else {
             this.driveStandard();
         }
@@ -152,7 +171,7 @@ public class Robot extends TimedRobot {
     // Robot status ----------------------------------------
 
     private void checkReset() {
-        if (this.primaryController.isXPressed()) {
+        if (this.primaryController.getXButton()) {
             this.navX.reset();
         }
     }
@@ -186,16 +205,28 @@ public class Robot extends TimedRobot {
         }
     }
 
-    private void driveCentric() {
+    public void autoStrafeDrive() {
+        if (this.isStrafeAligned())
+            this.strafeCentric(this.autoStrafer.pidOut, this.autoDriver.pidOut);
+        else
+            this.strafeCentric(this.autoStrafer.pidOut, 0);
+    }
+
+    private boolean isStrafeAligned() {
+        double offCenter = Math.abs(VISION_CENTER_X - (this.hatchZeroCenterX + this.hatchOneCenterX) / 2);
+        return offCenter < 30;
+    }
+
+    public void driveCentric() {
         this.drive.drive(-this.primaryController.getXLeft(), this.primaryController.getYLeft(), this.navX.getOutput(), -this.navX.getAngle());
     }
 
-    private void driveStandard() {
+    public void driveStandard() {
         this.drive.drive(this.primaryController.getXLeft(), -this.primaryController.getYLeft(), this.primaryController.getXRight(), 0);
     }
 
-    private void strafeCentric(double val) { //TODO: test
-        this.drive.drive(val, this.primaryController.getYLeft(), this.navX.getOutput(), -this.navX.getAngle());
+    public void strafeCentric(double x, double y) { //TODO: test
+        this.drive.drive(-x, y, this.navX.getOutput(), 0); // y as xSpeed is correct
     }
 
     // Telemetry/comms -------------------------------------
@@ -203,19 +234,34 @@ public class Robot extends TimedRobot {
     private void readNetTable() {
         NetworkTableInstance inst = NetworkTableInstance.getDefault();
         NetworkTable table = inst.getTable("vision");
-        NetworkTableEntry zeroX = table.getEntry("zeroX");
-        NetworkTableEntry zeroY = table.getEntry("zeroY");
-        NetworkTableEntry oneX = table.getEntry("oneX");
-        NetworkTableEntry oneY = table.getEntry("oneY");
-        NetworkTableEntry contours = table.getEntry("contoursCount");
+        NetworkTableEntry ballZeroX = table.getEntry("ballZeroX");
+        NetworkTableEntry ballZeroY = table.getEntry("ballZeroY");
+        NetworkTableEntry ballOneX = table.getEntry("ballOneX");
+        NetworkTableEntry ballOneY = table.getEntry("ballOneY");
+        NetworkTableEntry ballContours = table.getEntry("ballContoursCount");
+        NetworkTableEntry hatchZeroX = table.getEntry("hatchZeroX");
+        NetworkTableEntry hatchZeroY = table.getEntry("hatchZeroY");
+        NetworkTableEntry hatchOneX = table.getEntry("hatchOneX");
+        NetworkTableEntry hatchOneY = table.getEntry("hatchOneY");
+        NetworkTableEntry hatchContours = table.getEntry("hatchContoursCount");
+        NetworkTableEntry debug = table.getEntry("debug");
+        SmartDashboard.putNumber("debug", debug.getNumber(0).doubleValue());
         inst.startServer();
         inst.setServerTeam(4131);
 
-        this.zeroCenterX = zeroX.getDouble(0);
-        this.zeroCenterY = zeroY.getDouble(0);
-        this.oneCenterX = oneX.getDouble(0);
-        this.oneCenterY = oneY.getDouble(0);
-        this.contours = contours.getDouble(0);
+        this.ballZeroCenterX = ballZeroX.getDouble(0);
+        this.ballZeroCenterY = ballZeroY.getDouble(0);
+        this.ballOneCenterX = ballOneX.getDouble(0);
+        this.ballOneCenterY = ballOneY.getDouble(0);
+        this.ballContours = ballContours.getDouble(0);
+        this.hatchZeroCenterX = hatchZeroX.getDouble(0);
+        this.hatchZeroCenterY = hatchZeroY.getDouble(0);
+        this.hatchOneCenterX = hatchOneX.getDouble(0);
+        this.hatchOneCenterY = hatchOneY.getDouble(0);
+        this.hatchContours = hatchContours.getDouble(0);
+
+        NetworkTableEntry dir = table.getEntry("strings");
+        SmartDashboard.putString("dir", dir.getString("err"));
     }
 
     private void updateTelemetry() {
@@ -224,19 +270,28 @@ public class Robot extends TimedRobot {
 
         SmartDashboard.putBoolean("isCentric", this.isFieldCentric);
 
-        SmartDashboard.putNumber("zeroX", this.zeroCenterX);
-        SmartDashboard.putNumber("zeroY", this.zeroCenterY);
-        SmartDashboard.putNumber("oneX", this.oneCenterX);
-        SmartDashboard.putNumber("oneY", this.oneCenterY);
-        SmartDashboard.putNumber("contours", this.contours);
+        SmartDashboard.putNumber("ballZeroX", this.ballZeroCenterX);
+        SmartDashboard.putNumber("ballZeroY", this.ballZeroCenterY);
+        SmartDashboard.putNumber("ballOneX", this.ballOneCenterX);
+        SmartDashboard.putNumber("ballOneY", this.ballOneCenterY);
+        SmartDashboard.putNumber("ballContours", this.ballContours);
+        SmartDashboard.putNumber("hatchZeroX", this.hatchZeroCenterX);
+        SmartDashboard.putNumber("hatchZeroY", this.hatchZeroCenterY);
+        SmartDashboard.putNumber("hatchOneX", this.hatchOneCenterX);
+        SmartDashboard.putNumber("hatchOneY", this.hatchOneCenterY);
+        SmartDashboard.putNumber("hatchContours", this.hatchContours);
+
+        SmartDashboard.putNumber("pid for drive", this.autoDriver.pidOut);
+        SmartDashboard.putNumber("center average", (this.hatchZeroCenterX + this.hatchOneCenterX) / 2);
+        SmartDashboard.putNumber("center difference", this.hatchOneCenterX - this.hatchZeroCenterX);
     }
 
     private class AutoStrafer implements PIDSource, PIDOutput {
         PIDSourceType pidSourceType = PIDSourceType.kDisplacement;
         double pidOut;
 
-        void run() {
-            Robot.this.strafeCentric(this.pidOut);
+        public void run() {
+            Robot.this.strafeCentric(this.pidOut, Robot.this.primaryController.getYLeft());
         }
 
         @Override
@@ -257,9 +312,44 @@ public class Robot extends TimedRobot {
 
         @Override
         public double pidGet() {
+            double max = Math.max(Robot.this.hatchZeroCenterX, Robot.this.hatchOneCenterX);
+            double min = Math.min(Robot.this.hatchZeroCenterX, Robot.this.hatchOneCenterX);
             if (this.pidSourceType == PIDSourceType.kDisplacement) {
                 // assumes 0 is center of frame
-                return (160 - (Robot.this.zeroCenterX + Robot.this.oneCenterX) / 2) / (Robot.this.oneCenterX - Robot.this.zeroCenterX);
+                return (VISION_CENTER_X - (max + min) / 2) / (max - min);
+            } else {
+                // I don't really care about velocity for these... I think.
+                // TODO: If it doesn't work, may need to implement kVelocity
+                return 0;
+            }
+        }
+    }
+
+    private class AutoDriver implements PIDSource, PIDOutput {
+        PIDSourceType pidSourceType = PIDSourceType.kDisplacement;
+        double pidOut;
+
+        @Override
+        public void pidWrite(double output) {
+            this.pidOut = -output;
+        }
+
+        @Override
+        public void setPIDSourceType(PIDSourceType pidSource) {
+            this.pidSourceType = pidSource;
+        }
+
+        @Override
+        public PIDSourceType getPIDSourceType() {
+            return this.pidSourceType;
+        }
+
+        @Override
+        public double pidGet() {
+            double max = Math.max(Robot.this.hatchZeroCenterX, Robot.this.hatchOneCenterX);
+            double min = Math.min(Robot.this.hatchZeroCenterX, Robot.this.hatchOneCenterX);
+            if (this.pidSourceType == PIDSourceType.kDisplacement) {
+                return max - min;
             } else {
                 // I don't really care about velocity for these... I think.
                 // TODO: If it doesn't work, may need to implement kVelocity
